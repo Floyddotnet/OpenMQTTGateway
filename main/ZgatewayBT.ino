@@ -298,6 +298,150 @@ void MiLampDiscovery(char *mac){}
 void MiBandDiscovery(char *mac){}
 #endif
 
+void parseAdvertisedServiceData(BLEdevice *device, char *mac, const char *servicedatauuid, char *service_data, const char *mactopic, JsonObject *BLEdata)
+{
+  if (abs((int)(*BLEdata)["rssi"] | 0) < abs(Minrssi))
+  { // publish only the devices close enough
+    pub((char *)mactopic, *BLEdata);
+    if (strstr(servicedatauuid, "fe95") != NULL)
+    { //Mi FLora, Mi jia, Cleargrass Method 1, LYWSD02, VegTrug
+      Log.trace(F("Processing BLE device data" CR));
+      int pos = -1;
+      pos = strpos(service_data, "209800");
+      if (pos != -1)
+      {
+        Log.trace(F("mi flora data reading" CR));
+        //example "servicedata":"71209800bc63b6658d7cc40d0910023200"
+        
+        if (!isDiscovered(device))
+          MiFloraDiscovery(mac);
+
+        process_sensors(pos - 24, service_data, mac);
+      }
+      pos = -1;
+      pos = strpos(service_data, "20bc03");
+      if (pos != -1)
+      {
+        Log.trace(F("vegtrug data reading" CR));
+        //example "servicedata":"7120bc0399c309688d7cc40d0910020000"
+
+        if (!isDiscovered(device))
+          VegTrugDiscovery(mac);
+
+        process_sensors(pos - 24, service_data, mac);
+      }
+      pos = -1;
+      pos = strpos(service_data, "20aa01");
+      if (pos != -1)
+      {
+        Log.trace(F("mi jia data reading" CR));
+
+        if (!isDiscovered(device))
+          MiJiaDiscovery(mac);
+
+        process_sensors(pos - 26, service_data, mac);
+      }
+      pos = -1;
+      pos = strpos(service_data, "205b04");
+      if (pos != -1)
+      {
+        Log.trace(F("LYWSD02 data reading" CR));
+        //example "servicedata":"70205b04b96ab883c8593f09041002e000"
+
+        if (!isDiscovered(device))
+          LYWSD02Discovery(mac);
+
+        process_sensors(pos - 24, service_data, mac);
+      }
+      pos = -1;
+      pos = strpos(service_data, "304703");
+      if (pos != -1)
+      {
+        Log.trace(F("ClearGrass T RH data reading method 1" CR));
+        //example "servicedata":"5030470340743e10342d58041002d6000a100164"
+
+        if (!isDiscovered(device))
+          CLEARGRASSTRHDiscovery(mac);
+
+        process_sensors(pos - 26, service_data, mac);
+      }
+      pos = -1;
+      pos = strpos(service_data, "4030dd");
+      if (pos != -1)
+      {
+        Log.trace(F("Mi Lamp data reading" CR));
+        //example "servicedata":4030DD031D0300010100
+
+        if (!isDiscovered(device))
+          MiLampDiscovery(mac);
+
+        process_milamp(service_data, mac);
+      }
+    }
+    if (strstr(servicedatauuid, "181d") != NULL)
+    { // Mi Scale V1
+      Log.trace(F("Mi Scale V1 data reading" CR));
+      //example "servicedata":"a2ac2be307060207122b" /"a28039e3070602070e28"
+
+      if (!isDiscovered(device))
+        MiScaleDiscovery(mac);
+
+      process_scale_v1(service_data, mac);
+    }
+    if (strstr(servicedatauuid, "181b") != NULL)
+    { // Mi Scale V2
+      Log.trace(F("Mi Scale V2 data reading" CR));
+      //example "servicedata":02c4e1070b1e13050c00002607 / 02a6e20705150a251df401443e /02a6e20705180c0d04d701943e
+
+      if (!isDiscovered(device))
+        MiScaleDiscovery(mac);
+
+      process_scale_v2(service_data, mac);
+    }
+    if (strstr(servicedatauuid, "fee0") != NULL)
+    { // Mi Band //0000fee0-0000-1000-8000-00805f9b34fb // ESP32 only
+      Log.trace(F("Mi Band data reading" CR));
+      //example "servicedata":a21e0000
+
+      if (!isDiscovered(device))
+        MiBandDiscovery(mac);
+
+      process_miband(service_data, mac);
+    }
+    if (strstr(servicedatauuid, "08094c") != NULL)
+    { // Clear grass with air pressure//08094c0140342d580104d8000c020702612702015a
+      Log.trace(F("Clear grass data with air pressure reading" CR));
+      //example "servicedata":08094c0140342d580104 c400 2402 0702 5d27 02015a
+
+      if (!isDiscovered(device))
+        CLEARGRASSTRHKPADiscovery(mac);
+
+      process_cleargrass_air(service_data, mac);
+    }
+    if (strstr(servicedatauuid, "080774") != NULL)
+    { // Clear grass standard method 2/0807743e10342d580104c3002c0202012a
+      Log.trace(F("Clear grass data reading method 2" CR));
+      //example "servicedata":0807743e10342d580104 c300 2c02 02012a
+      // no discovery as it is already available with method 1
+      process_cleargrass(service_data, mac);
+    }
+    if (strstr(servicedatauuid, "080caf") != NULL)
+    { // Clear grass CGD1 080caffd50342d580104c900a102
+      Log.trace(F("Clear grass CGD1 data reading" CR));
+      //example "servicedata":080caffd50342d580104 c900 a102
+
+      if (!isDiscovered(device))
+        CLEARGRASSCGD1Discovery(mac);
+
+      process_cleargrass(service_data, mac);
+    }
+  }
+  else
+  {
+    Log.trace(F("Low rssi, device filtered" CR));
+  }
+}
+
 #ifdef ESP32
 /*
        Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleScan.cpp
@@ -373,146 +517,8 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
           BLEdata.set("servicedata", service_data);
           #endif
           BLEdata.set("servicedatauuid", (char *)advertisedDevice.getServiceDataUUID(j).toString().c_str());
-          if (abs((int)BLEdata["rssi"] | 0) < abs(Minrssi))
-          { // publish only the devices close enough
-            pub((char *)mactopic.c_str(), BLEdata);
-            if (strstr(BLEdata["servicedatauuid"].as<char *>(), "fe95") != NULL)
-            { //Mi FLora, Mi jia, Cleargrass Method 1, LYWSD02, VegTrug
-              Log.trace(F("Processing BLE device data" CR));
-              int pos = -1;
-              pos = strpos(service_data, "209800");
-              if (pos != -1)
-              {
-                Log.trace(F("mi flora data reading" CR));
-                //example "servicedata":"71209800bc63b6658d7cc40d0910023200"
-                
-                if (!isDiscovered(device))
-                  MiFloraDiscovery(mac);
-
-                process_sensors(pos - 24, service_data, mac);
-              }
-              pos = -1;
-              pos = strpos(service_data, "20bc03");
-              if (pos != -1)
-              {
-                Log.trace(F("vegtrug data reading" CR));
-                //example "servicedata":"7120bc0399c309688d7cc40d0910020000"
-
-                if (!isDiscovered(device))
-                  VegTrugDiscovery(mac);
-
-                process_sensors(pos - 24, service_data, mac);
-              }
-              pos = -1;
-              pos = strpos(service_data, "20aa01");
-              if (pos != -1)
-              {
-                Log.trace(F("mi jia data reading" CR));
-
-                if (!isDiscovered(device))
-                  MiJiaDiscovery(mac);
-
-                process_sensors(pos - 26, service_data, mac);
-              }
-              pos = -1;
-              pos = strpos(service_data, "205b04");
-              if (pos != -1)
-              {
-                Log.trace(F("LYWSD02 data reading" CR));
-                //example "servicedata":"70205b04b96ab883c8593f09041002e000"
-
-                if (!isDiscovered(device))
-                  LYWSD02Discovery(mac);
-
-                process_sensors(pos - 24, service_data, mac);
-              }
-              pos = -1;
-              pos = strpos(service_data, "304703");
-              if (pos != -1)
-              {
-                Log.trace(F("ClearGrass T RH data reading method 1" CR));
-                //example "servicedata":"5030470340743e10342d58041002d6000a100164"
-
-                if (!isDiscovered(device))
-                  CLEARGRASSTRHDiscovery(mac);
-
-                process_sensors(pos - 26, service_data, mac);
-              }
-              pos = -1;
-              pos = strpos(service_data, "4030dd");
-              if (pos != -1)
-              {
-                Log.trace(F("Mi Lamp data reading" CR));
-                //example "servicedata":4030DD031D0300010100
-
-                if (!isDiscovered(device))
-                  MiLampDiscovery(mac);
-
-                process_milamp(service_data, mac);
-              }
-            }
-            if (strstr(BLEdata["servicedatauuid"].as<char *>(), "181d") != NULL)
-            { // Mi Scale V1
-              Log.trace(F("Mi Scale V1 data reading" CR));
-              //example "servicedata":"a2ac2be307060207122b" /"a28039e3070602070e28"
-
-              if (!isDiscovered(device))
-                MiScaleDiscovery(mac);
-
-              process_scale_v1(service_data, mac);
-            }
-            if (strstr(BLEdata["servicedatauuid"].as<char *>(), "181b") != NULL)
-            { // Mi Scale V2
-              Log.trace(F("Mi Scale V2 data reading" CR));
-              //example "servicedata":02c4e1070b1e13050c00002607 / 02a6e20705150a251df401443e /02a6e20705180c0d04d701943e
-
-              if (!isDiscovered(device))
-                MiScaleDiscovery(mac);
-
-              process_scale_v2(service_data, mac);
-            }
-            if (strstr(BLEdata["servicedatauuid"].as<char *>(), "fee0") != NULL)
-            { // Mi Band //0000fee0-0000-1000-8000-00805f9b34fb // ESP32 only
-              Log.trace(F("Mi Band data reading" CR));
-              //example "servicedata":a21e0000
-
-              if (!isDiscovered(device))
-                MiBandDiscovery(mac);
-
-              process_miband(service_data, mac);
-            }
-            if (strstr(BLEdata["servicedata"].as<char *>(), "08094c") != NULL)
-            { // Clear grass with air pressure//08094c0140342d580104d8000c020702612702015a
-              Log.trace(F("Clear grass data with air pressure reading" CR));
-              //example "servicedata":08094c0140342d580104 c400 2402 0702 5d27 02015a
-
-              if (!isDiscovered(device))
-                CLEARGRASSTRHKPADiscovery(mac);
-
-              process_cleargrass_air(service_data, mac);
-            }
-            if (strstr(BLEdata["servicedata"].as<char *>(), "080774") != NULL)
-            { // Clear grass standard method 2/0807743e10342d580104c3002c0202012a
-              Log.trace(F("Clear grass data reading method 2" CR));
-              //example "servicedata":0807743e10342d580104 c300 2c02 02012a
-              // no discovery as it is already available with method 1
-              process_cleargrass(service_data, mac);
-            }
-            if (strstr(BLEdata["servicedata"].as<char *>(), "080caf") != NULL)
-            { // Clear grass CGD1 080caffd50342d580104c900a102
-              Log.trace(F("Clear grass CGD1 data reading" CR));
-              //example "servicedata":080caffd50342d580104 c900 a102
-
-              if (!isDiscovered(device))
-                CLEARGRASSCGD1Discovery(mac);
-
-              process_cleargrass(service_data, mac);
-            }
-          }
-          else
-          {
-            Log.trace(F("Low rssi, device filtered" CR));
-          }
+          
+          parseAdvertisedServiceData(device, mac, BLEdata["servicedatauuid"].as<char *>(), service_data, mactopic.c_str(), &BLEdata);
         }
       }
       else
@@ -708,118 +714,8 @@ bool BTtoMQTT()
             #ifdef pubBLEServiceData
             BLEdata.set("servicedata", (char *)service_data.c_str());
             #endif
-            if (abs((int)BLEdata["rssi"] | 0) < abs(Minrssi))
-            { // publish only the devices close enough
-              pub((char *)topic.c_str(), BLEdata);
-              int pos = -1;
-              pos = strpos(d[5].extract, "209800");
-              if (pos != -1)
-              {
-                Log.trace(F("mi flora data reading" CR));
 
-                if (!isDiscovered(device))
-                  MiFloraDiscovery(d[0].extract);
-
-                bool result = process_sensors(pos - 38, (char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "20aa01");
-              //example "servicedata":"5020aa0194dfaa33342d580d1004e3002c02"
-              if (pos != -1)
-              {
-                Log.trace(F("mi jia data reading" CR));
-
-                if (!isDiscovered(device))
-                  MiJiaDiscovery(d[0].extract);
-
-                bool result = process_sensors(pos - 40, (char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "205b04");
-              //example "servicedata":"141695fe70205b0461298882c8593f09061002d002"
-              if (pos != -1)
-              {
-                Log.trace(F("LYWSD02 data reading" CR));
-
-                if (!isDiscovered(device))
-                  LYWSD02Discovery(d[0].extract);
-
-                bool result = process_sensors(pos - 38, (char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "304703");
-              if (pos != -1)
-              {
-                Log.trace(F("CLEARGRASSTRH data reading method 1" CR));
-
-                if (!isDiscovered(device))
-                  CLEARGRASSTRHDiscovery(d[0].extract);
-
-                bool result = process_sensors(pos - 40, (char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "e30706");
-              if (pos != -1)
-              {
-                Log.trace(F("Mi Scale data reading" CR));
-                //example "servicedata":"a2ac2be307060207122b" /"a28039e3070602070e28"
-
-                if (!isDiscovered(device))
-                  MiScaleDiscovery(d[0].extract);
-
-                bool result = process_scale_v1((char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "4030dd");
-              if (pos != -1)
-              {
-                Log.trace(F("Mi Lamp data reading" CR));
-                //example "servicedata":4030dd31d0300010100
-
-                if (!isDiscovered(device))
-                  MiLampDiscovery(d[0].extract);
-
-                process_milamp((char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "08094c"); // Clear grass with air pressure//08094c0140342d580104d8000c020702612702015a
-              if (pos != -1)
-              {
-                Log.trace(F("Clear grass data with air pressure reading" CR));
-                //example "servicedata":08094c0140342d580104 c400 2402 0702 5d27 02015a
-
-                if (!isDiscovered(device))
-                  CLEARGRASSTRHKPADiscovery(d[0].extract);
-
-                process_cleargrass_air((char *)service_data.c_str(), d[0].extract);
-              }
-              pos = -1;
-              pos = strpos(d[5].extract, "080774"); // Clear grass standard method 2/0807743e10342d580104c3002c0202012a
-              if (pos != -1)
-              {
-                Log.trace(F("Clear grass data reading method 2" CR));
-                //example "servicedata":0807743e10342d580104 c300 2c02 02012a
-                // no discovery as it is already available with method 1
-                process_cleargrass((char *)service_data.c_str(), d[0].extract);
-              }
-              pos = strpos(d[5].extract, "080caf"); // Clear grass CGD1 08094c0140342d580104d8000c020702612702015a
-              if (pos != -1)
-              {
-                Log.trace(F("Clear grass data CGD1" CR));
-                //example "servicedata":080caffd50342d580104 c900 a102
-
-                if (!isDiscovered(device))
-                  CLEARGRASSCGD1Discovery(d[0].extract);
-
-                process_cleargrass((char *)service_data.c_str(), d[0].extract);
-              }
-
-              return true;
-            }
-            else
-            {
-              Log.trace(F("Low rssi, device filtered" CR));
-            }
+            parseAdvertisedServiceData(device, d[0].extract, 0, (char *)service_data.c_str(), topic.c_str(), &BLEdata);
           }
         }
       }
