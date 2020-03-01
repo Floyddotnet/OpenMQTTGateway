@@ -25,7 +25,6 @@ BLEAdvertisedDevice::BLEAdvertisedDevice() {
 	m_manufacturerData = "";
 	m_name             = "";
 	m_rssi             = -9999;
-	m_serviceData      = "";
 	m_txPower          = 0;
 	m_pScan            = nullptr;
 
@@ -101,13 +100,25 @@ BLEScan* BLEAdvertisedDevice::getScan() {
 	return m_pScan;
 } // getScan
 
+/**
+  * @brief Get the number of service data.
+  * @return Number of service data discovered.
+  */
+ int BLEAdvertisedDevice::getServiceDataCount() {
+ 	if (m_haveServiceData)
+ 		return m_serviceDataVector.size();
+ 	else
+ 		return 0;
+
+  } //getServiceDataCount
+
 
 /**
  * @brief Get the service data.
  * @return The ServiceData of the advertised device.
  */
-std::string BLEAdvertisedDevice::getServiceData() {
-	return m_serviceData;
+std::string BLEAdvertisedDevice::getServiceData(int i) {
+	return m_serviceDataVector[i];
 } //getServiceData
 
 
@@ -115,8 +126,8 @@ std::string BLEAdvertisedDevice::getServiceData() {
  * @brief Get the service data UUID.
  * @return The service data UUID.
  */
-BLEUUID BLEAdvertisedDevice::getServiceDataUUID() {
-	return m_serviceDataUUID;
+BLEUUID BLEAdvertisedDevice::getServiceDataUUID(int i) {
+	return m_serviceDataUUIDs[i];
 } // getServiceDataUUID
 
 
@@ -124,8 +135,8 @@ BLEUUID BLEAdvertisedDevice::getServiceDataUUID() {
  * @brief Get the Service UUID.
  * @return The Service UUID of the advertised device.
  */
-BLEUUID BLEAdvertisedDevice::getServiceUUID() {  //TODO Remove it eventually, is no longer useful
-	return m_serviceUUIDs[0];
+BLEUUID BLEAdvertisedDevice::getServiceUUID(int i) {
+	return m_serviceUUIDs[i];
 } // getServiceUUID
 
 /**
@@ -454,7 +465,7 @@ void BLEAdvertisedDevice::setServiceUUID(BLEUUID serviceUUID) {
  */
 void BLEAdvertisedDevice::setServiceData(std::string serviceData) {
 	m_haveServiceData = true;         // Set the flag that indicates we have service data.
-	m_serviceData     = serviceData;  // Save the service data that we received.
+	m_serviceDataVector.push_back(serviceData);// Save the service data that we received.
 } //setServiceData
 
 
@@ -464,7 +475,8 @@ void BLEAdvertisedDevice::setServiceData(std::string serviceData) {
  */
 void BLEAdvertisedDevice::setServiceDataUUID(BLEUUID uuid) {
 	m_haveServiceData = true;         // Set the flag that indicates we have service data.
-	m_serviceDataUUID = uuid;
+	m_serviceDataUUIDs.push_back(uuid);
+	ESP_LOGD(LOG_TAG, "- addServiceDataUUID(): serviceDataUUID: %s", uuid.toString().c_str());
 } // setServiceDataUUID
 
 
@@ -484,29 +496,25 @@ void BLEAdvertisedDevice::setTXPower(int8_t txPower) {
  * @return A string representation of this device.
  */
 std::string BLEAdvertisedDevice::toString() {
-	std::string res = "Name: " + getName() + ", Address: " + getAddress().toString();
+	std::stringstream ss;
+	ss << "Name: " << getName() << ", Address: " << getAddress().toString();
 	if (haveAppearance()) {
-		char val[6];
-		snprintf(val, sizeof(val), "%d", getAppearance());
-		res += ", appearance: ";
-		res += val;
+		ss << ", appearance: " << getAppearance();
 	}
 	if (haveManufacturerData()) {
 		char *pHex = BLEUtils::buildHexData(nullptr, (uint8_t*)getManufacturerData().data(), getManufacturerData().length());
-		res += ", manufacturer data: ";
-		res += pHex;
+		ss << ", manufacturer data: " << pHex;
 		free(pHex);
 	}
 	if (haveServiceUUID()) {
-		res += ", serviceUUID: " + getServiceUUID().toString();
+		for (int i; i < m_serviceUUIDs.size(); i++) {
+			ss << ", serviceUUID: " << getServiceUUID(i).toString();
+		}
 	}
 	if (haveTXPower()) {
-		char val[4];
-		snprintf(val, sizeof(val), "%d", getTXPower());
-		res += ", txPower: ";
-		res += val;
+		ss << ", txPower: " << (int)getTXPower();
 	}
-	return res;
+	return ss.str();
 } // toString
 
 uint8_t* BLEAdvertisedDevice::getPayload() {
