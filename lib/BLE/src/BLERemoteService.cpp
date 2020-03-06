@@ -14,8 +14,6 @@
 #include <esp_err.h>
 #include "esp32-hal-log.h"
 
-#pragma GCC diagnostic warning "-Wunused-but-set-parameter"
-
 BLERemoteService::BLERemoteService(
 		esp_gatt_id_t srvcId,
 		BLEClient*    pClient,
@@ -166,7 +164,7 @@ void BLERemoteService::retrieveCharacteristics() {
 	uint16_t offset = 0;
 	esp_gattc_char_elem_t result;
 	while (true) {
-		uint16_t count = 1; // only room for 1 result allocated, so go one by one
+		uint16_t count = 1;  // this value is used as in parameter that allows to search max 10 chars with the same uuid
 		esp_gatt_status_t status = ::esp_ble_gattc_get_all_char(
 			getClient()->getGattcIf(),
 			getClient()->getConnId(),
@@ -227,23 +225,10 @@ std::map<std::string, BLERemoteCharacteristic*>* BLERemoteService::getCharacteri
 } // getCharacteristics
 
 /**
- * @brief Retrieve a map of all the characteristics of this service.
- * @return A map of all the characteristics of this service.
- */
-std::map<uint16_t, BLERemoteCharacteristic*>* BLERemoteService::getCharacteristicsByHandle() {
-	// If is possible that we have not read the characteristics associated with the service so do that
-	// now.  The request to retrieve the characteristics by calling "retrieveCharacteristics" is a blocking
-	// call and does not return until all the characteristics are available.
-	if (!m_haveCharacteristics) {
-		retrieveCharacteristics();
-	}
-	return &m_characteristicMapByHandle;
-} // getCharacteristicsByHandle
-
-/**
  * @brief This function is designed to get characteristics map when we have multiple characteristics with the same UUID
  */
 void BLERemoteService::getCharacteristics(std::map<uint16_t, BLERemoteCharacteristic*>* pCharacteristicMap) {
+#pragma GCC diagnostic ignored "-Wunused-but-set-parameter"
 	pCharacteristicMap = &m_characteristicMapByHandle;
 }  // Get the characteristics map.
 
@@ -332,25 +317,15 @@ void BLERemoteService::setValue(BLEUUID characteristicUuid, std::string value) {
  * @return A string representation of this remote service.
  */
 std::string BLERemoteService::toString() {
-	std::string res = "Service: uuid: " + m_uuid.toString();
-	char val[6];
-	res += ", start_handle: ";
-	snprintf(val, sizeof(val), "%d", m_startHandle);
-	res += val;
-	snprintf(val, sizeof(val), "%04x", m_startHandle);
-	res += " 0x";
-	res += val;
-	res += ", end_handle: ";
-	snprintf(val, sizeof(val), "%d", m_endHandle);
-	res += val;
-	snprintf(val, sizeof(val), "%04x", m_endHandle);
-	res += " 0x";
-	res += val;
+	std::ostringstream ss;
+	ss << "Service: uuid: " + m_uuid.toString();
+	ss << ", start_handle: " << std::dec << m_startHandle << " 0x" << std::hex << m_startHandle <<
+			", end_handle: " << std::dec << m_endHandle << " 0x" << std::hex << m_endHandle;
 	for (auto &myPair : m_characteristicMap) {
-		res += "\n" + myPair.second->toString();
+		ss << "\n" << myPair.second->toString();
 	   // myPair.second is the value
 	}
-	return res;
+	return ss.str();
 } // toString
 
 

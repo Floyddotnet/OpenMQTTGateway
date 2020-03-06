@@ -42,7 +42,7 @@ FreeRTOS::Semaphore semaphoreCreateOrUpdateDevice = FreeRTOS::Semaphore("createO
 using namespace std;
 vector<BLEdevice> devices;
 
-static BLEdevice NO_DEVICE_FOUND = { {0,0,0,0,0,0,0,0,0,0,0,0}, false, false, false };
+static BLEdevice NO_DEVICE_FOUND = { {0,0,0,0,0,0,0,0,0,0,0,0}, false, false, false, false, 0, nullptr, nullptr };
 static bool oneWhite = false;
 
 BLEdevice * getDeviceByMac(const char *mac)
@@ -69,13 +69,13 @@ bool updateWorB(JsonObject &BTdata, bool isWhite)
   {
     const char *mac = BTdata[jsonKey][i];
 
-    createOrUpdateDevice(mac, (isWhite ? device_flags_isWhiteL : device_flags_isBlackL));
+    createOrUpdateDevice(mac, (isWhite ? device_flags_isWhiteL : device_flags_isBlackL), device_type_unset);
   }
   
   return true;
 }
 
-void createOrUpdateDevice(const char *mac, uint8_t flags)
+void createOrUpdateDevice(const char *mac, uint8_t flags, uint8_t device_type)
 {
 #ifdef ESP32
   if (!semaphoreCreateOrUpdateDevice.take(30000, "createOrUpdateDevice"))
@@ -92,6 +92,8 @@ void createOrUpdateDevice(const char *mac, uint8_t flags)
     device->isDisc = flags & device_flags_isDisc;
     device->isWhtL = flags & device_flags_isWhiteL;
     device->isBlkL = flags & device_flags_isBlackL;
+    device->deviceType = device_type;
+    device->queryActive = false;
     devices.push_back(*device);
   }
   else
@@ -108,6 +110,11 @@ void createOrUpdateDevice(const char *mac, uint8_t flags)
       device->isWhtL = flags & device_flags_isWhiteL;
       device->isBlkL = flags & device_flags_isBlackL;
     }
+
+    if(device_type != device_type_unset)
+    {
+      device->deviceType = device_type;
+    }
   }
 
   // update oneWhite flag
@@ -118,6 +125,35 @@ void createOrUpdateDevice(const char *mac, uint8_t flags)
 #endif
 }
 
+void updateDeviceSetQueryActive(char *mac, BLEdeviceQueryActive queryActiveCb)
+{
+#ifdef ESP32
+  if (!semaphoreCreateOrUpdateDevice.take(30000, "updateDeviceSetQueryActive"))
+    return;
+#endif
+
+  BLEdevice *device = getDeviceByMac(mac);
+  device->queryActiveCb = queryActiveCb;
+  device->queryActive = true;
+
+#ifdef ESP32
+  semaphoreCreateOrUpdateDevice.give();
+#endif
+}
+
+#ifdef ESP32
+void updateDeviceSetBleAddess(char *mac, BLEAddress *bleAddress)
+{
+  if (!semaphoreCreateOrUpdateDevice.take(30000, "updateDeviceSetBleAddess"))
+    return;
+
+  BLEdevice *device = getDeviceByMac(mac);
+  device->bleAddress = bleAddress;
+
+  semaphoreCreateOrUpdateDevice.give();
+}
+#endif
+
 #define isWhite(device) device->isWhtL
 #define isBlack(device) device->isBlkL
 #define isDiscovered(device) device->isDisc
@@ -126,10 +162,7 @@ void dumpDevices()
 {
   for (vector<BLEdevice>::iterator p = devices.begin(); p != devices.end(); ++p)
   {
-    Log.trace(F("macAdr %s" CR),p->macAdr);
-    Log.trace(F("isDisc %d" CR),p->isDisc);
-    Log.trace(F("isWhtL %d" CR),p->isWhtL);
-    Log.trace(F("isBlkL %d" CR),p->isBlkL);
+    Log.trace(F("macAdr %s, deviceTyp %d, isDisc %d, isWhtl %d, isBlkL %d, queryActive: %d" CR),p->macAdr, p->deviceType, p->isDisc, p->isWhtL, p->isBlkL, p->queryActive);
   }
 }
 
@@ -153,7 +186,7 @@ void MiFloraDiscovery(char *mac)
   };
 
   createDiscoveryFromList(mac, MiFlorasensor, MiFloraparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_MiFlora);
 }
 
 void VegTrugDiscovery(char *mac)
@@ -169,7 +202,7 @@ void VegTrugDiscovery(char *mac)
   };
   
   createDiscoveryFromList(mac, VegTrugsensor, VegTrugparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_VegTrug);
 }
 
 void MiJiaDiscovery(char *mac)
@@ -184,7 +217,7 @@ void MiJiaDiscovery(char *mac)
   };
   
   createDiscoveryFromList(mac, MiJiasensor, MiJiaparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_MiJia);
 }
 
 void LYWSD02Discovery(char *mac)
@@ -199,7 +232,24 @@ void LYWSD02Discovery(char *mac)
   };
 
   createDiscoveryFromList(mac, LYWSD02sensor, LYWSD02parametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_LYWSD02);
+}
+
+void LYWSD03MMCDiscovery(char *mac)
+{
+/*#define LYWSD02parametersCount 3
+  Log.trace(F("LYWSD02Discovery" CR));
+  char *LYWSD02sensor[LYWSD02parametersCount][8] = {
+      {"sensor", "LYWSD02-batt", mac, "battery", "{{ value_json.batt | is_defined }}", "", "", "V"},
+      {"sensor", "LYWSD02-tem", mac, "temperature", "{{ value_json.tem | is_defined }}", "", "", "°C"},
+      {"sensor", "LYWSD02-hum", mac, "humidity", "{{ value_json.hum | is_defined }}", "", "", "%"}
+      //component type,name,availability topic,device class,value template,payload on, payload off, unit of measurement
+  };
+
+  createDiscoveryFromList(mac, LYWSD02sensor, LYWSD02parametersCount);
+*/
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_LYWSD03MMC);
+  updateDeviceSetQueryActive(mac, sensorLYWSD03MMCRead);
 }
 
 void CLEARGRASSTRHDiscovery(char *mac)
@@ -214,7 +264,7 @@ void CLEARGRASSTRHDiscovery(char *mac)
   };
 
   createDiscoveryFromList(mac, CLEARGRASSTRHsensor, CLEARGRASSTRHparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_ClearGrassTRH);
 }
 
 void CLEARGRASSCGD1Discovery(char *mac)
@@ -229,7 +279,7 @@ void CLEARGRASSCGD1Discovery(char *mac)
   };
 
   createDiscoveryFromList(mac, CLEARGRASSCGD1sensor, CLEARGRASSCGD1parametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_ClearGrassCGD1);
 }
 
 void CLEARGRASSTRHKPADiscovery(char *mac)
@@ -244,7 +294,7 @@ void CLEARGRASSTRHKPADiscovery(char *mac)
   };
 
   createDiscoveryFromList(mac, CLEARGRASSTRHKPAsensor, CLEARGRASSTRHKPAparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_ClearGrassTRHKPA);
 }
 
 void MiScaleDiscovery(char *mac)
@@ -257,7 +307,7 @@ void MiScaleDiscovery(char *mac)
   };
 
   createDiscoveryFromList(mac, MiScalesensor, MiScaleparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_MiScale);
 }
 
 void MiLampDiscovery(char *mac)
@@ -270,7 +320,7 @@ void MiLampDiscovery(char *mac)
   };
 
   createDiscoveryFromList(mac, MiLampsensor, MiLampparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_MiLamp);
 }
 
 void MiBandDiscovery(char *mac)
@@ -283,13 +333,14 @@ void MiBandDiscovery(char *mac)
   };
 
   createDiscoveryFromList(mac, MiBandsensor, MiBandparametersCount);
-  createOrUpdateDevice(mac, device_flags_isDisc);
+  createOrUpdateDevice(mac, device_flags_isDisc, device_type_MiBand);
 }
 #else
 void MiFloraDiscovery(char *mac){}
 void VegTrugDiscovery(char *mac){}
 void MiJiaDiscovery(char *mac){}
 void LYWSD02Discovery(char *mac){}
+void LYWSD03MMCDiscovery(char *mac){}
 void CLEARGRASSTRHDiscovery(char *mac){}
 void CLEARGRASSCGD1Discovery(char *mac){}
 void CLEARGRASSTRHKPADiscovery(char *mac){}
@@ -305,12 +356,18 @@ void MiBandDiscovery(char *mac){}
     */
 // core task implementation thanks to https://techtutorialsx.com/2017/05/09/esp32-running-code-on-a-specific-core/
 
+#include <BLEAddress.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
+#include <BLECharacteristic.h>
+#include <BLERemoteCharacteristic.h>
+#include <BLERemoteService.h>
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
+
+void sensorLYWSD03MMCNotifyCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 
 //core on which the BLE detection task will run
 static int taskCore = 0;
@@ -347,6 +404,12 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
       if (advertisedDevice.haveRSSI())
         haRoomPresence(BLEdata); // this device has an rssi in consequence we can use it for home assistant room presence component
       #endif
+
+      if (advertisedDevice.haveName())
+        Log.trace(F("device name: %s = %s" CR), advertisedDevice.getName().c_str(), mac);
+
+      bool supportedDevice = false, isActiveDevice = false;;
+
       if (advertisedDevice.haveServiceData())
       {
         int serviceDataCount = advertisedDevice.getServiceDataCount();
@@ -390,6 +453,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                   MiFloraDiscovery(mac);
 
                 process_sensors(pos - 24, service_data, mac);
+                supportedDevice = true;
               }
               pos = -1;
               pos = strpos(service_data, "20bc03");
@@ -402,6 +466,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                   VegTrugDiscovery(mac);
 
                 process_sensors(pos - 24, service_data, mac);
+                supportedDevice = true;
               }
               pos = -1;
               pos = strpos(service_data, "20aa01");
@@ -413,6 +478,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                   MiJiaDiscovery(mac);
 
                 process_sensors(pos - 26, service_data, mac);
+                supportedDevice = true;
               }
               pos = -1;
               pos = strpos(service_data, "205b04");
@@ -425,6 +491,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                   LYWSD02Discovery(mac);
 
                 process_sensors(pos - 24, service_data, mac);
+                supportedDevice = true;
               }
               pos = -1;
               pos = strpos(service_data, "304703");
@@ -437,6 +504,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                   CLEARGRASSTRHDiscovery(mac);
 
                 process_sensors(pos - 26, service_data, mac);
+                supportedDevice = true;
               }
               pos = -1;
               pos = strpos(service_data, "4030dd");
@@ -449,6 +517,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                   MiLampDiscovery(mac);
 
                 process_milamp(service_data, mac);
+                supportedDevice = true;
               }
             }
             if (strstr(BLEdata["servicedatauuid"].as<char *>(), "181d") != NULL)
@@ -460,6 +529,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                 MiScaleDiscovery(mac);
 
               process_scale_v1(service_data, mac);
+              supportedDevice = true;
             }
             if (strstr(BLEdata["servicedatauuid"].as<char *>(), "181b") != NULL)
             { // Mi Scale V2
@@ -470,6 +540,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                 MiScaleDiscovery(mac);
 
               process_scale_v2(service_data, mac);
+              supportedDevice = true;
             }
             if (strstr(BLEdata["servicedatauuid"].as<char *>(), "fee0") != NULL)
             { // Mi Band //0000fee0-0000-1000-8000-00805f9b34fb // ESP32 only
@@ -480,6 +551,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                 MiBandDiscovery(mac);
 
               process_miband(service_data, mac);
+              supportedDevice = true;
             }
             if (strstr(BLEdata["servicedata"].as<char *>(), "08094c") != NULL)
             { // Clear grass with air pressure//08094c0140342d580104d8000c020702612702015a
@@ -490,6 +562,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                 CLEARGRASSTRHKPADiscovery(mac);
 
               process_cleargrass_air(service_data, mac);
+              supportedDevice = true;
             }
             if (strstr(BLEdata["servicedata"].as<char *>(), "080774") != NULL)
             { // Clear grass standard method 2/0807743e10342d580104c3002c0202012a
@@ -497,6 +570,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
               //example "servicedata":0807743e10342d580104 c300 2c02 02012a
               // no discovery as it is already available with method 1
               process_cleargrass(service_data, mac);
+              supportedDevice = true;
             }
             if (strstr(BLEdata["servicedata"].as<char *>(), "080caf") != NULL)
             { // Clear grass CGD1 080caffd50342d580104c900a102
@@ -507,6 +581,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
                 CLEARGRASSCGD1Discovery(mac);
 
               process_cleargrass(service_data, mac);
+              supportedDevice = true;
             }
           }
           else
@@ -515,7 +590,21 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
           }
         }
       }
-      else
+      
+      if (advertisedDevice.haveName() && strcmp(advertisedDevice.getName().c_str(), "LYWSD03MMC") == 0)
+      {
+        Log.trace(F("@@@ LYWSD03MMC found" CR));
+
+        LYWSD03MMCDiscovery(mac);
+        supportedDevice = isActiveDevice = true;
+      }
+
+      if (isActiveDevice)
+      {
+        updateDeviceSetBleAddess(mac, new BLEAddress(advertisedDevice.getAddress()));
+      }
+
+      if(!supportedDevice)
       {
         if (abs((int)BLEdata["rssi"] | 0) < abs(Minrssi))
         {                                         // publish only the devices close enough
@@ -534,6 +623,117 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   }
 };
 
+class MyClientCallback : public BLEClientCallbacks {
+    void onConnect(BLEClient* pclient) {
+      Log.trace(F("Connected to %s" CR), pclient->getPeerAddress().toString().c_str());
+    }
+
+    void onDisconnect(BLEClient* pclient) {
+      Log.trace(F("Disconnected from %s" CR), pclient->getPeerAddress().toString().c_str());
+    }
+};
+
+static BLEClient *bleClient;
+FreeRTOS::Semaphore semaphoreNotifyCallback = FreeRTOS::Semaphore("semaphoreNotifyCallback");
+
+void queryActiveDevices()
+{
+  bleClient = BLEDevice::createClient();
+  bleClient->setClientCallbacks(new MyClientCallback());
+
+  for (vector<BLEdevice>::iterator p = devices.begin(); p != devices.end(); ++p)
+  {
+    if (!p->queryActive) 
+      continue;
+    
+    if (p->queryActiveCb == nullptr){
+      Log.error(F("queryActive without queryActiveCb: %s" CR), p->macAdr);
+      continue;
+    }
+
+    Log.trace(F("connect" CR));
+
+    bleClient->connect(*p->bleAddress);
+
+    delay(1000);
+
+    Log.trace(F("queryActiveCb" CR));
+
+    p->queryActiveCb(&(*p));
+
+    Log.trace(F("wait for  semaphoreNotifyCallback " CR));
+
+    if(semaphoreNotifyCallback.take(30000, "queryActiveDevices"))
+      semaphoreNotifyCallback.give();
+
+    delay(20);
+
+Log.trace(F("isConnected " CR));
+
+    if(bleClient->isConnected())
+    {
+      Log.trace(F("disconnect " CR));
+      bleClient->disconnect();
+    }
+
+    delay(20);
+  }
+};
+
+void sensorLYWSD03MMCNotifyCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify)
+{
+  delay(2000);
+
+  Log.trace(F("sensorLYWSD03MMCNotifyCallback" CR));
+
+  float temp;
+  float humi;
+  temp = (pData[0] | (pData[1] << 8)) * 0.01; //little endian 
+  humi = pData[2];
+  Log.trace(F("temp = %.1f : humidity = %.1f" CR) , temp, humi);
+
+  Log.trace(F("Notify callback for characteristic: %s" CR), pBLERemoteCharacteristic->getUUID().toString().c_str());
+  //bleClient->disconnect();
+
+  semaphoreNotifyCallback.give();
+};
+
+void sensorLYWSD03MMCRead(BLEdevice *device)
+{
+  Log.trace(F("take sensorLYWSD03MMCRead" CR));
+  semaphoreNotifyCallback.take("sensorLYWSD03MMCRead");
+
+  // The remote service we wish to connect to.
+  BLEUUID serviceUUID("ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6");
+  // The characteristic of the remote service we are interested in.
+  BLEUUID    charUUID("ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6");
+
+Log.trace(F("getService sensorLYWSD03MMCRead" CR));
+  // Obtain a reference to the service we are after in the remote BLE server.
+  BLERemoteService* pRemoteService = bleClient->getService("ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6");
+  if (pRemoteService == nullptr) 
+  {
+    Log.error(F("Failed to find our service UUID: %s" CR), serviceUUID.toString().c_str());
+    bleClient->disconnect();
+    return;
+  }
+  Log.trace(F("Found service for LYWSD03MMC" CR));
+
+  // Obtain a reference to the characteristic in the service of the remote BLE server.
+  BLERemoteCharacteristic* pRemoteCharacteristic = pRemoteService->getCharacteristic("ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6");
+  if (pRemoteCharacteristic == nullptr) 
+  {
+    Log.error(F("Failed to find our characteristic UUID: %s" CR), charUUID.toString().c_str());
+    bleClient->disconnect();
+    return;
+  }
+  Log.trace(F("Found characteristic for LYWSD03MMC" CR));
+  pRemoteCharacteristic->registerForNotify(sensorLYWSD03MMCNotifyCallback, true);
+  Log.trace(F("registerForNotify done " CR));
+
+  delay(20);
+};
+
 void BLEscan()
 {
 
@@ -547,7 +747,17 @@ void BLEscan()
   pBLEScan->setAdvertisedDeviceCallbacks(&myCallbacks);
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
   BLEScanResults foundDevices = pBLEScan->start(Scan_duration);
-  Log.notice(F("Scan end, deinit controller" CR));
+  Log.notice(F("Scan end" CR));
+  
+  pBLEScan->stop();
+
+  dumpDevices();
+
+  Log.notice(F("query active devices" CR));
+
+  queryActiveDevices();
+
+  Log.notice(F("deinit ble controller" CR));
   esp_bt_controller_deinit();
 }
 
@@ -558,15 +768,15 @@ void coreTask(void *pvParameters)
   {
     Log.trace(F('BT Task running on core: %d'),xPortGetCoreID());
     delay(BLEinterval);
-    if (client.state() == 0)
+    //if (client.state() == 0)
     {
       BLEscan();
     }
-    else
-    {
-      Log.warning(F("MQTT client disconnected no BLE scan" CR));
-      delay(1000);
-    }
+    // else
+    // {
+    //   Log.warning(F("MQTT client disconnected no BLE scan" CR));
+    //   delay(1000);
+    // }
   }
 }
 

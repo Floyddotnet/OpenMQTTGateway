@@ -26,6 +26,10 @@
 #ifndef config_BT_h
 #define config_BT_h
 
+#ifdef ESP32
+#include <BLEAddress.h>
+#endif
+
 extern void setupBT();
 extern bool BTtoMQTT();  
 extern void MQTTtoBT(char * topicOri, JsonObject& RFdata);
@@ -48,16 +52,43 @@ extern void MQTTtoBT(char * topicOri, JsonObject& RFdata);
 unsigned int BLEinterval ; //time between 2 scans
 int Minrssi ; //minimum rssi value
 
-struct BLEdevice{
+struct BLEdevice;
+
+typedef void (* BLEdeviceQueryActive)(BLEdevice *device);
+
+
+struct BLEdevice {
   char macAdr[13];
   bool isDisc;
   bool isWhtL;
   bool isBlkL;
+  bool queryActive;
+  uint8_t deviceType;
+  BLEdeviceQueryActive queryActiveCb;
+#ifdef ESP32
+  //store BLEAddress here to avoid memory leek
+  //BLEClient.connect need a BLEAddress instance but used callbacks so its a little bit harder to free this memory after each action especial in case of errors
+  //reusing the discovered BLEAddress avoid this problem
+  BLEAddress *bleAddress;
+#endif
 };
 
 #define device_flags_isDisc 1 << 0
 #define device_flags_isWhiteL 1 << 1
 #define device_flags_isBlackL 1 << 2
+
+#define device_type_unset 0
+#define device_type_MiFlora 1
+#define device_type_VegTrug 2
+#define device_type_MiJia 3
+#define device_type_LYWSD02 4
+#define device_type_ClearGrassTRH 5
+#define device_type_ClearGrassCGD1 6
+#define device_type_ClearGrassTRHKPA 7
+#define device_type_MiScale 8
+#define device_type_MiLamp 9
+#define device_type_MiBand 10
+#define device_type_LYWSD03MMC 11
 
 struct decompose{
   char subject[4];

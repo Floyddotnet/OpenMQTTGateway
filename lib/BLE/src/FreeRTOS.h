@@ -40,8 +40,6 @@ public:
 		bool        take(uint32_t timeoutMs, std::string owner = "<Unknown>");
 		std::string toString();
 		uint32_t	wait(std::string owner = "<Unknown>");
-		bool		timedWait(std::string owner = "<Unknown>", uint32_t timeoutMs = portMAX_DELAY);
-		uint32_t	value(){ return m_value; };
 
 	private:
 		SemaphoreHandle_t m_semaphore;
@@ -58,16 +56,16 @@ public:
 /**
  * @brief Ringbuffer.
  */
-class Ringbuffer {
-public:
-	Ringbuffer(size_t length, ringbuf_type_t type = RINGBUF_TYPE_NOSPLIT);
-	~Ringbuffer();
+// class Ringbuffer {
+// public:
+// 	Ringbuffer(size_t length, ringbuf_typ_t type = RINGBUF_TYPE_NOSPLIT);
+// 	~Ringbuffer();
 
-	void*    receive(size_t* size, TickType_t wait = portMAX_DELAY);
-	void     returnItem(void* item);
-	bool     send(void* data, size_t length, TickType_t wait = portMAX_DELAY);
-private:
-	RingbufHandle_t m_handle;
-};
+// 	void*    receive(size_t* size, TickType_t wait = portMAX_DELAY);
+// 	void     returnItem(void* item);
+// 	bool     send(void* data, size_t length, TickType_t wait = portMAX_DELAY);
+// private:
+// 	RingbufHandle_t m_handle;
+// };
 
 #endif /* MAIN_FREERTOS_H_ */

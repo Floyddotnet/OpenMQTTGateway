@@ -95,7 +95,7 @@ private:
 	std::vector<BLEUUID> m_serviceUUIDs;
 	std::vector<BLEUUID> m_serviceDataUUIDs;
 	std::vector<std::string> m_serviceDataVector;
-	int8_t      m_txPower;
+	int8_t      m_txPower;	
 	uint8_t*	m_payload;
 	size_t		m_payloadLength = 0;
 	esp_ble_addr_type_t m_addressType;

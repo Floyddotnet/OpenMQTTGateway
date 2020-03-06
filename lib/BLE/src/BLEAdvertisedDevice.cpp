@@ -121,7 +121,6 @@ std::string BLEAdvertisedDevice::getServiceData(int i) {
 	return m_serviceDataVector[i];
 } //getServiceData
 
-
 /**
  * @brief Get the service data UUID.
  * @return The service data UUID.
@@ -129,7 +128,6 @@ std::string BLEAdvertisedDevice::getServiceData(int i) {
 BLEUUID BLEAdvertisedDevice::getServiceDataUUID(int i) {
 	return m_serviceDataUUIDs[i];
 } // getServiceDataUUID
-
 
 /**
  * @brief Get the Service UUID.
@@ -476,7 +474,6 @@ void BLEAdvertisedDevice::setServiceData(std::string serviceData) {
 void BLEAdvertisedDevice::setServiceDataUUID(BLEUUID uuid) {
 	m_haveServiceData = true;         // Set the flag that indicates we have service data.
 	m_serviceDataUUIDs.push_back(uuid);
-	ESP_LOGD(LOG_TAG, "- addServiceDataUUID(): serviceDataUUID: %s", uuid.toString().c_str());
 } // setServiceDataUUID
 
 

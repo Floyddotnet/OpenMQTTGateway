@@ -32,7 +32,13 @@
 #include "esp32-hal-bt.h"
 #endif
 
+#if defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
+
+#else
+#include "esp_log.h"
+static const char* LOG_TAG = "BLEDevice";
+#endif
 
 
 /**
@@ -473,8 +479,9 @@ gatts_event_handler BLEDevice::m_customGattsHandler = nullptr;
  * @return A string representation of the nature of this device.
  */
 /* STATIC */ std::string BLEDevice::toString() {
-	std::string res = "BD Address: " + getAddress().toString();
-	return res;
+	std::ostringstream oss;
+	oss << "BD Address: " << getAddress().toString();
+	return oss.str();
 } // toString
 
 
@@ -482,9 +489,9 @@ gatts_event_handler BLEDevice::m_customGattsHandler = nullptr;
  * @brief Add an entry to the BLE white list.
  * @param [in] address The address to add to the white list.
  */
-void BLEDevice::whiteListAdd(BLEAddress address) {
+void BLEDevice::whiteListAdd(BLEAddress address, esp_ble_wl_addr_type_t wl_addr_type) {
 	log_v(">> whiteListAdd: %s", address.toString().c_str());
-	esp_err_t errRc = esp_ble_gap_update_whitelist(true, *address.getNative());  // True to add an entry.
+	esp_err_t errRc = esp_ble_gap_update_whitelist(true, *address.getNative(), wl_addr_type);  // True to add an entry.
 	if (errRc != ESP_OK) {
 		log_e("esp_ble_gap_update_whitelist: rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
 	}
@@ -496,9 +503,9 @@ void BLEDevice::whiteListAdd(BLEAddress address) {
  * @brief Remove an entry from the BLE white list.
  * @param [in] address The address to remove from the white list.
  */
-void BLEDevice::whiteListRemove(BLEAddress address) {
+void BLEDevice::whiteListRemove(BLEAddress address, esp_ble_wl_addr_type_t wl_addr_type) {
 	log_v(">> whiteListRemove: %s", address.toString().c_str());
-	esp_err_t errRc = esp_ble_gap_update_whitelist(false, *address.getNative());  // False to remove an entry.
+	esp_err_t errRc = esp_ble_gap_update_whitelist(false, *address.getNative(), wl_addr_type);  // False to remove an entry.
 	if (errRc != ESP_OK) {
 		log_e("esp_ble_gap_update_whitelist: rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
 	}
@@ -619,7 +626,7 @@ void BLEDevice::removePeerDevice(uint16_t conn_id, bool _client) {
     esp_bluedroid_deinit();
     esp_bt_controller_disable();
     esp_bt_controller_deinit();
-#ifdef ARDUINO_ARCH_ESP32
+#ifndef ARDUINO_ARCH_ESP32
     if (release_memory) {
         esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);  // <-- require tests because we released classic BT memory and this can cause crash (most likely not, esp-idf takes care of it)
     } else {

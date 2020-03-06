@@ -78,38 +78,6 @@ uint32_t FreeRTOS::Semaphore::wait(std::string owner) {
 	return m_value;
 } // wait
 
-/**
- * @brief Wait for a semaphore to be released in a given period of time by trying to take it and
- * then releasing it again. The value associated with the semaphore can be taken by value() call after return
- * @param [in] owner A debug tag.
- * @param [in] timeoutMs timeout to wait in ms.
- * @return True if we took the semaphore within timeframe.
- */
-bool FreeRTOS::Semaphore::timedWait(std::string owner, uint32_t timeoutMs) {
-	log_v(">> wait: Semaphore waiting: %s for %s", toString().c_str(), owner.c_str());
-
-	if (m_usePthreads && timeoutMs != portMAX_DELAY) {
-		assert(false);  // We apparently don't have a timed wait for pthreads.
-	}
-
-	auto ret = pdTRUE;
-
-	if (m_usePthreads) {
-		pthread_mutex_lock(&m_pthread_mutex);
-	} else {
-		ret = xSemaphoreTake(m_semaphore, timeoutMs);
-	}
-
-	if (m_usePthreads) {
-		pthread_mutex_unlock(&m_pthread_mutex);
-	} else {
-		xSemaphoreGive(m_semaphore);
-	}
-
-	log_v("<< wait: Semaphore %s released: %d", toString().c_str(), ret);
-	return ret;
-} // wait
-
 
 FreeRTOS::Semaphore::Semaphore(std::string name) {
 	m_usePthreads = false;   	// Are we using pThreads or FreeRTOS?
@@ -234,12 +202,9 @@ bool FreeRTOS::Semaphore::take(uint32_t timeoutMs, std::string owner) {
  * @return A string representation of the semaphore.
  */
 std::string FreeRTOS::Semaphore::toString() {
-	char hex[9];
-	std::string res = "name: " + m_name + " (0x";
-	snprintf(hex, sizeof(hex), "%08x", (uint32_t)m_semaphore);
-	res += hex;
-	res += "), owner: " + m_owner;
-	return res;
+	std::stringstream stringStream;
+	stringStream << "name: "<< m_name << " (0x" << std::hex << std::setfill('0') << (uint32_t)m_semaphore << "), owner: " << m_owner;
+	return stringStream.str();
 } // toString
 
 
@@ -252,50 +217,50 @@ void FreeRTOS::Semaphore::setName(std::string name) {
 } // setName
 
 
-/**
- * @brief Create a ring buffer.
- * @param [in] length The amount of storage to allocate for the ring buffer.
- * @param [in] type The type of buffer.  One of RINGBUF_TYPE_NOSPLIT, RINGBUF_TYPE_ALLOWSPLIT, RINGBUF_TYPE_BYTEBUF.
- */
-Ringbuffer::Ringbuffer(size_t length, ringbuf_type_t type) {
-	m_handle = ::xRingbufferCreate(length, type);
-} // Ringbuffer
+// /**
+//  * @brief Create a ring buffer.
+//  * @param [in] length The amount of storage to allocate for the ring buffer.
+//  * @param [in] type The type of buffer.  One of RINGBUF_TYPE_NOSPLIT, RINGBUF_TYPE_ALLOWSPLIT, RINGBUF_TYPE_BYTEBUF.
+//  */
+// Ringbuffer::Ringbuffer(size_t length, ringbuf_type_t type) {
+// 	m_handle = ::xRingbufferCreate(length, type);
+// } // Ringbuffer
 
 
-Ringbuffer::~Ringbuffer() {
-	::vRingbufferDelete(m_handle);
-} // ~Ringbuffer
+// Ringbuffer::~Ringbuffer() {
+// 	::vRingbufferDelete(m_handle);
+// } // ~Ringbuffer
 
 
-/**
- * @brief Receive data from the buffer.
- * @param [out] size On return, the size of data returned.
- * @param [in] wait How long to wait.
- * @return A pointer to the storage retrieved.
- */
-void* Ringbuffer::receive(size_t* size, TickType_t wait) {
-	return ::xRingbufferReceive(m_handle, size, wait);
-} // receive
+// /**
+//  * @brief Receive data from the buffer.
+//  * @param [out] size On return, the size of data returned.
+//  * @param [in] wait How long to wait.
+//  * @return A pointer to the storage retrieved.
+//  */
+// void* Ringbuffer::receive(size_t* size, TickType_t wait) {
+// 	return ::xRingbufferReceive(m_handle, size, wait);
+// } // receive
 
 
-/**
- * @brief Return an item.
- * @param [in] item The item to be returned/released.
- */
-void Ringbuffer::returnItem(void* item) {
-	::vRingbufferReturnItem(m_handle, item);
-} // returnItem
+// /**
+//  * @brief Return an item.
+//  * @param [in] item The item to be returned/released.
+//  */
+// void Ringbuffer::returnItem(void* item) {
+// 	::vRingbufferReturnItem(m_handle, item);
+// } // returnItem
 
 
-/**
- * @brief Send data to the buffer.
- * @param [in] data The data to place into the buffer.
- * @param [in] length The length of data to place into the buffer.
- * @param [in] wait How long to wait before giving up.  The default is to wait indefinitely.
- * @return
- */
-bool Ringbuffer::send(void* data, size_t length, TickType_t wait) {
-	return ::xRingbufferSend(m_handle, data, length, wait) == pdTRUE;
-} // send
+// /**
+//  * @brief Send data to the buffer.
+//  * @param [in] data The data to place into the buffer.
+//  * @param [in] length The length of data to place into the buffer.
+//  * @param [in] wait How long to wait before giving up.  The default is to wait indefinitely.
+//  * @return
+//  */
+// bool Ringbuffer::send(void* data, size_t length, TickType_t wait) {
+// 	return ::xRingbufferSend(m_handle, data, length, wait) == pdTRUE;
+// } // send
 
 

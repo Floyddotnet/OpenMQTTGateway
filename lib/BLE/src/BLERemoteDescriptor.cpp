@@ -55,7 +55,7 @@ std::string BLERemoteDescriptor::readValue() {
 	// Check to see that we are connected.
 	if (!getRemoteCharacteristic()->getRemoteService()->getClient()->isConnected()) {
 		log_e("Disconnected");
-		return std::string();
+		throw BLEDisconnectedException();
 	}
 
 	m_semaphoreReadDescrEvt.take("readValue");
@@ -113,12 +113,9 @@ uint32_t BLERemoteDescriptor::readUInt32() {
  * @retun A string representation of this BLE Remote Descriptor.
  */
 std::string BLERemoteDescriptor::toString() {
-	char val[6];
-	snprintf(val, sizeof(val), "%d", getHandle());
-	std::string res = "handle: ";
-	res += val;
-	res += ", uuid: " + getUUID().toString();
-	return res;
+	std::stringstream ss;
+	ss << "handle: " << getHandle() << ", uuid: " << getUUID().toString();
+	return ss.str();
 } // toString
 
 
@@ -133,7 +130,7 @@ void BLERemoteDescriptor::writeValue(uint8_t* data, size_t length, bool response
 	// Check to see that we are connected.
 	if (!getRemoteCharacteristic()->getRemoteService()->getClient()->isConnected()) {
 		log_e("Disconnected");
-		return;
+		throw BLEDisconnectedException();
 	}
 
 	esp_err_t errRc = ::esp_ble_gattc_write_char_descr(

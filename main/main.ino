@@ -27,6 +27,10 @@
 */
 #include "User_config.h"
 
+#ifdef ESP32
+//#define BTU_TASK_STACK_SIZE             (4096 + BT_TASK_EXTRA_STACK_SIZE)
+#endif
+
 // array to store previous received RFs, IRs codes and their timestamps
 #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
 #define array_size 12
@@ -324,97 +328,97 @@ void pub_custom_topic(char *topicori, JsonObject &data, boolean retain)
 // Low level MQTT functions 
 void pubMQTT(char * topic, char * payload)
 {
-    client.publish(topic, payload);
+    //client.publish(topic, payload);
 }
 
 void pubMQTT(char * topicori, char * payload, bool retainFlag)
 {
-  client.publish(topicori, payload, retainFlag);
+  //client.publish(topicori, payload, retainFlag);
 }
 
 void pubMQTT(String topic, char *  payload)
 {
-    client.publish((char *)topic.c_str(),payload);
+    //client.publish((char *)topic.c_str(),payload);
 }
 
 void pubMQTT(char *topic, unsigned long payload)
 {
   char val[11];
   sprintf(val, "%lu", payload);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(char *topic, unsigned long long payload)
 {
   char val[21];
   sprintf(val, "%llu", payload);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(char *topic, String payload)
 {
-  client.publish(topic, (char *)payload.c_str());
+  //client.publish(topic, (char *)payload.c_str());
 }
 
 void pubMQTT(String topic, String payload)
 {
-  client.publish((char *)topic.c_str(), (char *)payload.c_str());
+  //client.publish((char *)topic.c_str(), (char *)payload.c_str());
 }
 
 void pubMQTT(String topic, int payload)
 {
   char val[12];
   sprintf(val, "%d", payload);
-  client.publish((char *)topic.c_str(), val);
+  //client.publish((char *)topic.c_str(), val);
 }
 
 void pubMQTT(String topic, float payload)
 {
   char val[12];
   dtostrf(payload, 3, 1, val);
-  client.publish((char *)topic.c_str(), val);
+  //client.publish((char *)topic.c_str(), val);
 }
 
 void pubMQTT(char *topic, float payload)
 {
   char val[12];
   dtostrf(payload, 3, 1, val);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(char *topic, int payload)
 {
   char val[6];
   sprintf(val, "%d", payload);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(char *topic, unsigned int payload)
 {
   char val[6];
   sprintf(val, "%u", payload);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(char *topic, long payload)
 {
   char val[11];
   sprintf(val, "%l", payload);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(char *topic, double payload)
 {
   char val[16];
   sprintf(val, "%d", payload);
-  client.publish(topic, val);
+  //client.publish(topic, val);
 }
 
 void pubMQTT(String topic, unsigned long payload)
 {
   char val[11];
   sprintf(val, "%lu", payload);
-  client.publish((char *)topic.c_str(), val);
+  //client.publish((char *)topic.c_str(), val);
 }
 
 void logJson(JsonObject &jsondata)
@@ -526,12 +530,16 @@ void setup_parameters()
   strcat(mqtt_topic, gateway_name);
 }
 
+#include <esp_coexist.h>
+
 void setup()
 {
   //Launch serial for debugging purposes
   Serial.begin(SERIAL_BAUD);
   Log.begin(LOG_LEVEL, &Serial);
   Log.notice(F(CR "************* WELCOME TO OpenMQTTGateway **************" CR));
+
+Log.trace(F("ESP IDF VERSION %s" CR), esp_get_idf_version());
 
 #if defined(ESP8266) || defined(ESP32)
   #ifdef ESP8266
@@ -549,39 +557,42 @@ void setup()
 
   Log.trace(F("OpenMQTTGateway mac: %s" CR),WiFi.macAddress().c_str());
   Log.trace(F("OpenMQTTGateway ip: %s" CR),WiFi.localIP().toString().c_str());
+  //Log.trace(F("esp_coex_version: %s" CR), esp_coex_version_get());
 
-  // Port defaults to 8266
-  ArduinoOTA.setPort(ota_port);
+  esp_coex_preference_set(ESP_COEX_PREFER_WIFI);
 
-  // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname(ota_hostname);
+  // // Port defaults to 8266
+  // ArduinoOTA.setPort(ota_port);
 
-  // No authentication by default
-  ArduinoOTA.setPassword(ota_password);
+  // // Hostname defaults to esp8266-[ChipID]
+  // ArduinoOTA.setHostname(ota_hostname);
 
-  ArduinoOTA.onStart([]() {
-    Log.trace(F("Start OTA" CR));
-  });
-  ArduinoOTA.onEnd([]() {
-    Log.trace(F("\nEnd OTA" CR));
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Log.trace(F("Progress: %u%%\r" CR), (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR)
-      Log.error(F("Auth Failed" CR));
-    else if (error == OTA_BEGIN_ERROR)
-      Log.error(F("Begin Failed" CR));
-    else if (error == OTA_CONNECT_ERROR)
-      Log.error(F("Connect Failed" CR));
-    else if (error == OTA_RECEIVE_ERROR)
-      Log.error(F("Receive Failed" CR));
-    else if (error == OTA_END_ERROR)
-      Log.error(F("End Failed" CR));
-  });
-  ArduinoOTA.begin();
+  // // No authentication by default
+  // ArduinoOTA.setPassword(ota_password);
+
+  // ArduinoOTA.onStart([]() {
+  //   Log.trace(F("Start OTA" CR));
+  // });
+  // ArduinoOTA.onEnd([]() {
+  //   Log.trace(F("\nEnd OTA" CR));
+  // });
+  // ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+  //   Log.trace(F("Progress: %u%%\r" CR), (progress / (total / 100)));
+  // });
+  // ArduinoOTA.onError([](ota_error_t error) {
+  //   Serial.printf("Error[%u]: ", error);
+  //   if (error == OTA_AUTH_ERROR)
+  //     Log.error(F("Auth Failed" CR));
+  //   else if (error == OTA_BEGIN_ERROR)
+  //     Log.error(F("Begin Failed" CR));
+  //   else if (error == OTA_CONNECT_ERROR)
+  //     Log.error(F("Connect Failed" CR));
+  //   else if (error == OTA_RECEIVE_ERROR)
+  //     Log.error(F("Receive Failed" CR));
+  //   else if (error == OTA_END_ERROR)
+  //     Log.error(F("End Failed" CR));
+  // });
+  // ArduinoOTA.begin();
 
   #else // In case of arduino platform
 
@@ -1109,7 +1120,7 @@ void loop()
         Log.trace(F("RFM69toMQTT OK" CR));
       #endif
       #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
-      stateMeasures();
+      //stateMeasures();
       #endif
       #ifdef ZactuatorFASTLED
       FASTLEDLoop();
@@ -1120,7 +1131,7 @@ void loop()
       if (now - lastMQTTReconnectAttempt > 5000)
       {
         lastMQTTReconnectAttempt = now;
-        reconnect();
+        //reconnect();
       }
     }
   }
@@ -1135,7 +1146,7 @@ void loop()
         #if defined(ESPWifiManualSetup)
         Log.notice(F("restarting ESP" CR));
           #ifdef ESP32
-          ESP.restart();
+          //ESP.restart();
           #endif
           #ifdef ESP8266
           ESP.reset();
