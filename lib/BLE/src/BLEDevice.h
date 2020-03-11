@@ -40,8 +40,13 @@ public:
 	static void        setPower(esp_power_level_t powerLevel);  // Set our power level.
 	static void        setValue(BLEAddress bdAddress, BLEUUID serviceUUID, BLEUUID characteristicUUID, std::string value);   // Set the value of a characteristic on a service on a server.
 	static std::string toString();        // Return a string representation of our device.
+#ifdef ESPIDF4
 	static void        whiteListAdd(BLEAddress address, esp_ble_wl_addr_type_t wl_addr_type);    // Add an entry to the BLE white list.
 	static void        whiteListRemove(BLEAddress address, esp_ble_wl_addr_type_t wl_addr_type); // Remove an entry from the BLE white list.
+#else
+	static void        whiteListAdd(BLEAddress address);    // Add an entry to the BLE white list.
+	static void        whiteListRemove(BLEAddress address); // Remove an entry from the BLE white list.
+#endif
 	static void		   setEncryptionLevel(esp_ble_sec_act_t level);
 	static void		   setSecurityCallbacks(BLESecurityCallbacks* pCallbacks);
 	static esp_err_t   setMTU(uint16_t mtu);

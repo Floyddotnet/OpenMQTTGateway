@@ -484,7 +484,7 @@ gatts_event_handler BLEDevice::m_customGattsHandler = nullptr;
 	return oss.str();
 } // toString
 
-
+#ifdef ESPIDF4
 /**
  * @brief Add an entry to the BLE white list.
  * @param [in] address The address to add to the white list.
@@ -511,7 +511,34 @@ void BLEDevice::whiteListRemove(BLEAddress address, esp_ble_wl_addr_type_t wl_ad
 	}
 	log_v("<< whiteListRemove");
 } // whiteListRemove
+#else
+/**
+ * @brief Add an entry to the BLE white list.
+ * @param [in] address The address to add to the white list.
+ */
+void BLEDevice::whiteListAdd(BLEAddress address) {
+	log_v(">> whiteListAdd: %s", address.toString().c_str());
+	esp_err_t errRc = esp_ble_gap_update_whitelist(true, *address.getNative());  // True to add an entry.
+	if (errRc != ESP_OK) {
+		log_e("esp_ble_gap_update_whitelist: rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
+	}
+	log_v("<< whiteListAdd");
+} // whiteListAdd
 
+
+/**
+ * @brief Remove an entry from the BLE white list.
+ * @param [in] address The address to remove from the white list.
+ */
+void BLEDevice::whiteListRemove(BLEAddress address) {
+	log_v(">> whiteListRemove: %s", address.toString().c_str());
+	esp_err_t errRc = esp_ble_gap_update_whitelist(false, *address.getNative());  // False to remove an entry.
+	if (errRc != ESP_OK) {
+		log_e("esp_ble_gap_update_whitelist: rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
+	}
+	log_v("<< whiteListRemove");
+} // whiteListRemove
+#endif
 /*
  * @brief Set encryption level that will be negotiated with peer device durng connection
  * @param [in] level Requested encryption level
